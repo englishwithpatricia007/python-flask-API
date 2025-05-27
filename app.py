@@ -14,19 +14,6 @@ class Product(db.Model):
     price = db.Column(db.Float, nullable=False)
     description = db.Column(db.Text, nullable=True)
 
-
-@app.route('/api/products/<int:product_id>', methods=['GET'])
-def get_product_details(product_id):
-    product = Product.query.get(product_id)
-    if not product:
-        return jsonify({"error": "Product not found"}), 404
-    return jsonify({
-        "id": product.id,
-        "name": product.name,
-        "price": product.price,
-        "description": product.description
-    }), 200
-
 @app.route('/api/products', methods=['GET'])
 def get_all_products():
     products = Product.query.all()
@@ -42,6 +29,18 @@ def get_all_products():
     if not product_list:
         return jsonify({"message": "No products found"}), 404 
     return jsonify(product_list), 200
+
+@app.route('/api/products/<int:product_id>', methods=['GET'])
+def get_product_details(product_id):
+    product = Product.query.get(product_id)
+    if not product:
+        return jsonify({"error": "Product not found"}), 404
+    return jsonify({
+        "id": product.id,
+        "name": product.name,
+        "price": product.price,
+        "description": product.description
+    }), 200
 
 @app.route('/api/products/add', methods=['POST'])
 def add_product():
