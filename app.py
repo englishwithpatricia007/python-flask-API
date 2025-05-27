@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
-from flask_login import UserMixin, login_user, LoginManager
+from flask_login import UserMixin, login_user, LoginManager, login_required, logout_user
 
 app = Flask(__name__)
 ##RuntimeError: The session is unavailable because no secret key was set.  Set the secret_key on the application to something unique and secret.
@@ -26,6 +26,11 @@ class Product(db.Model):
     price = db.Column(db.Float, nullable=False)
     description = db.Column(db.Text, nullable=True)
 
+#Autenticação
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
 @app.route('/login', methods=['POST'])
 def login():
     data = request.json
@@ -39,6 +44,12 @@ def login():
     else:
         return jsonify({"error": "Invalid credentials"}), 401
     
+@app.route('/logout', methods=['POST'])
+@login_required
+def logout():
+    logout_user()
+    return jsonify({"message": "Logout successful"}), 200   
+
 
 @app.route('/api/products', methods=['GET'])
 def get_all_products():
@@ -69,6 +80,7 @@ def get_product_details(product_id):
     }), 200
 
 @app.route('/api/products/add', methods=['POST'])
+@login_required
 def add_product():
    data = request.json
    if not data or 'name' not in data or 'price' not in data:
@@ -85,6 +97,7 @@ def add_product():
    return jsonify({"message": "Product added successfully"}), 201
 
 @app.route('/api/products/update/<int:product_id>', methods=['PUT'])
+@login_required
 def update_product(product_id):
     product = Product.query.get(product_id)
     if not product:
@@ -102,6 +115,7 @@ def update_product(product_id):
     return jsonify({"message": "Product updated successfully"}), 200
 
 @app.route('/api/products/delete/<int:product_id>', methods=['DELETE'])
+@login_required
 def delete_product(product_id):
     product = Product.query.get(product_id)
     if not product:
