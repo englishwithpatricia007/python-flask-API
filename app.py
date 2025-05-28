@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
-from flask_login import UserMixin, login_user, LoginManager, login_required, logout_user
+from flask_login import UserMixin, login_user, LoginManager, login_required, logout_user, current_user
 
 app = Flask(__name__)
 ##RuntimeError: The session is unavailable because no secret key was set.  Set the secret_key on the application to something unique and secret.
@@ -19,6 +19,7 @@ class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password = db.Column(db.String(80), nullable=False)
+    cart = db.relationship('CartItem', backref='user', lazy=True)
 
 class Product(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -26,11 +27,17 @@ class Product(db.Model):
     price = db.Column(db.Float, nullable=False)
     description = db.Column(db.Text, nullable=True)
 
+class CartItem(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+
 #Autenticação
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
 
+# USER MANAGEMENT
 @app.route('/login', methods=['POST'])
 def login():
     data = request.json
@@ -50,7 +57,7 @@ def logout():
     logout_user()
     return jsonify({"message": "Logout successful"}), 200   
 
-
+#PRODUCT MANAGEMENT
 @app.route('/api/products', methods=['GET'])
 def get_all_products():
     products = Product.query.all()
@@ -126,14 +133,72 @@ def delete_product(product_id):
 
     return jsonify({"message": "Product deleted successfully"}), 200
 
+# CART MANAGEMENT
+
+@app.route('/api/cart/add/<int:product_id>', methods=['POST'])
+@login_required
+def add_to_cart(product_id):
+    product = Product.query.get(product_id)
+    if not product:
+        return jsonify({"error": "Product not found"}), 404
+    
+    user = User.query.get(int(current_user.id))
+    if not user:
+        return jsonify({"error": "User not found"}), 404;
+    
+    new_cart_item = CartItem(product_id=product_id, user_id=current_user.id)
+    db.session.add(new_cart_item)
+    db.session.commit()
+
+    return jsonify({"message": "Product added to cart"}), 201
 
 
+@app.route('/api/cart/remove/<int:product_id>', methods=['DELETE'])
+@login_required
+def remove_from_cart(product_id):
+    cart_item = CartItem.query.filter_by(product_id=product_id, user_id=current_user.id).first()
+    if not cart_item:
+        return jsonify({"error": "Cart item not found"}), 404
+    
+    db.session.delete(cart_item)
+    db.session.commit()
 
-@app.route('/teste')
-def hello_world():  
-  return 'Hello, World!'
+    return jsonify({"message": "Product removed from cart"}), 200
+
+@app.route('/api/cart', methods=['GET'])
+@login_required
+def view_cart():
+    #cart_items = CartItem.query.filter_by(user_id=current_user.id).all()
+    
+    user = User.query.get(int(current_user.id))
+    cart_items = user.cart
+
+    if not cart_items:
+        return jsonify({"message": "Cart is empty"}), 200
+    
+    cart_list = []
+    for item in cart_items:
+        product = Product.query.get(item.product_id)
+        if product:
+            cart_list.append({
+                "product_id": product.id,
+                "name": product.name,
+                "price": product.price
+            })
+    
+    return jsonify(cart_list), 200
 
 
+@app.route('/api/cart/checkout', methods=['POST'])
+@login_required
+def checkout_cart():
+    user = User.query.get(int(current_user.id))
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    
+    CartItem.query.filter_by(user_id=current_user.id).delete()
+    db.session.commit()
 
+    return jsonify({"message": "Checkout successful."}), 200
 
 if __name__ == '__main__': app.run(debug=True)
