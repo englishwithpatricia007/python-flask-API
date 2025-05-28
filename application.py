@@ -37,6 +37,10 @@ class CartItem(db.Model):
 def load_user(user_id):
     return User.query.get(int(user_id))
 
+@application.route('/')
+def index():
+    return jsonify({"message": "Welcome to the E-commerce API"}), 200
+
 # USER MANAGEMENT
 @application.route('/login', methods=['POST'])
 def login():
