@@ -78,6 +78,7 @@ Para criar um usuário:
 flask shell
 user = User(username="admin", password="123")
 db.session.add(user)
+db.session.commit()
 exit()
 ```
 
